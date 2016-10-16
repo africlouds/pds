@@ -1,0 +1,14 @@
+Tracking klzsdfngvjkdfngsdfgkln
+
+<script type="text/javascript"
+  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClZw3R63FghnycvQVypPxOTUZyHAXilEU&libraries=geometry">
+</script>
+<div id="map-canvas"></div>
+
+
+<script>
+        {% include "pds/templates/includes/tracking.js" %}
+        frappe.ready(function() {
+                tracking($('#map-canvas'));
+        });
+</script>

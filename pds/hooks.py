@@ -16,7 +16,9 @@ app_license = "MIT"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/pds/css/pds.css"
-# app_include_js = "/assets/pds/js/pds.js"
+app_include_js = [
+	"https://maps.googleapis.com/maps/api/js?key=AIzaSyClZw3R63FghnycvQVypPxOTUZyHAXilEU&libraries=geometry"
+]
 
 # include js, css files in header of web template
 # web_include_css = "/assets/pds/css/pds.css"
