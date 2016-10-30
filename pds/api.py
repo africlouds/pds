@@ -1,7 +1,10 @@
 import frappe
 from frappe import _
 import requests 
+import googlemaps
 from pubnub import Pubnub
+
+gmaps = googlemaps.Client(key='AIzaSyClZw3R63FghnycvQVypPxOTUZyHAXilEU')
 
 
 
@@ -27,15 +30,35 @@ def send_pubnub(doc, method):
 
 def create_message(doc, method):
 	delivery_request = frappe.get_doc("Delivery Request", doc.name)
+	closest_clerk = get_closest_clerk(delivery_request.pickup_point)
+	delivery_request.assigned_clerk = closest_clerk.name
+	delivery_request.save()
 	frappe.get_doc({
 	  	"doctype": "Message", 
-	  	"delivery_clerk": get_closest_clerk(delivery_request.pickup_point),
+	  	"delivery_clerk": closest_clerk.name,
 		"message":"A delivery task from %s to %s is assigned to you" % (delivery_request.pickup_point, delivery_request.dropoff_point),
 		"from_client":"Tim",
 		"type":"Delivery Request"		
 	}).insert()
 
-def get_closest_clerk(origin):
-	return "d2a166ca9c"
-
+def get_closest_clerk(pickup_point):
+	#get all clerks
+	all_clerks = frappe.get_list("Delivery Clerk", fields=['name','location'])
+	#make the first clerk as the closest
+	clerk_locations = []
+	pickup_point = pickup_point.split(",")
+	#loop over all clerk comparing their current locations to the closest
+	for clerk in all_clerks:
+		location = clerk.location.split(",")
+		clerk_locations.append((float(location[0]), float(location[1])))
+	directions_result = gmaps.distance_matrix(clerk_locations,(pickup_point[0], pickup_point[1]))
+	closest = 0
+	for i, row in enumerate(directions_result['rows']):
+		row = row['elements'][0]
+		duration = row['duration']['value']
+		distance = row['distance']['value']
+		closest_clerk = directions_result['rows'][closest]
+		if closest_clerk['elements'][0]['duration']['value'] > duration:
+			closest = i
+	return all_clerks[closest]
 
