@@ -74,7 +74,14 @@ app_include_js = [
 
 doc_events = {
  	"Delivery Request": {
- 		"after_insert": "pds.api.send_fcm"
+ 		"after_insert": "pds.api.send_fcm",
+		"after_insert": "pds.api.create_message"
+	},
+	"Location": {
+		"after_insert": "pds.api.send_pubnub"
+	},
+	"Message": {
+	
 	}
 }
 

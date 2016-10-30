@@ -1,6 +1,9 @@
 import frappe
 from frappe import _
 import requests 
+from pubnub import Pubnub
+
+
 
 def send_fcm(doc, method):
 	delivery = frappe.get_doc("Delivery Request", doc.name)
@@ -13,4 +16,26 @@ def send_fcm(doc, method):
 	}
 	r = requests.post('https://fcm.googleapis.com/fcm/send', json=data, headers=headers)
 	frappe.msgprint(str(r.status_code))
-	
+
+
+def send_pubnub(doc, method):
+	location = frappe.get_doc("Location", doc.name)
+	pubnub = Pubnub(publish_key="pub-c-21663d8a-850d-4d99-adb3-3dda55a02abd", subscribe_key="sub-c-266bcbc0-9884-11e6-b146-0619f8945a4f")
+	message = {'lat':location.latitude, 'lng':location.longitude}
+	pubnub.publish(channel='mymaps', message=message)
+
+
+def create_message(doc, method):
+	delivery_request = frappe.get_doc("Delivery Request", doc.name)
+	frappe.get_doc({
+	  	"doctype": "Message", 
+	  	"delivery_clerk": get_closest_clerk(delivery_request.pickup_point),
+		"message":"A delivery task from %s to %s is assigned to you" % (delivery_request.pickup_point, delivery_request.dropoff_point),
+		"from_client":"Tim",
+		"type":"Delivery Request"		
+	}).insert()
+
+def get_closest_clerk(origin):
+	return "d2a166ca9c"
+
+
