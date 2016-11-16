@@ -1,14 +1,111 @@
-Tracking klzsdfngvjkdfngsdfgkln
+<style>
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      #map {
+        position:absolute;
+        top:0;
+        bottom:0;
+        width:100%;
+      }
+</style>
 
-<script type="text/javascript"
-  src="https://maps.googleapis.com/maps/api/js?key=AIzaSyClZw3R63FghnycvQVypPxOTUZyHAXilEU&libraries=geometry">
-</script>
-<div id="map-canvas"></div>
+<script type="text/javascript" src="https://pubnub.github.io/eon/v/eon/1.0.0/eon.js"></script>
+<link type="text/css" rel="stylesheet" href="https://pubnub.github.io/eon/v/eon/1.0.0/eon.css"/>
 
 
+<body>
+    <div id='map'></div>
+    <script>
+      function getNonZeroRandomNumber(){
+        var random = Math.floor(Math.random()*199) - 99;
+        if(random==0) return getNonZeroRandomNumber();
+        return random;
+      }
+    </script>
+    <script>
+      var pn = new PubNub({
+        publishKey: 'pub-c-21663d8a-850d-4d99-adb3-3dda55a02abd',
+        subscribeKey: 'sub-c-266bcbc0-9884-11e6-b146-0619f8945a4f',
+        ssl: (('https:' == document.location.protocol) ? true : false)
+      });
+      function getNonZeroRandomNumber(){
+        var random = Math.floor(Math.random()*199) - 99;
+        if(random==0) return getNonZeroRandomNumber();
+        return random;
+      }
+      var channel = 'dashboard';
+      var map = eon.map({
+        pubnub: pn,
+        id: 'map',
+        mbId: 'ianjennings.l896mh2e',
+        mbToken: 'pk.eyJ1IjoiaWFuamVubmluZ3MiLCJhIjoiZExwb0p5WSJ9.XLi48h-NOyJOCJuu1-h-Jg',
+        channels:[channel],
+        connect: connect,
+        message: function (data) {
+          map.setView([-1.944472, 30.081003], 13);
+        }
+      });
+      function connect() {
+        var me = {
+          icon: {
+            'marker-color': '#ce1126'
+          }
+        };
+        var them = {
+          icon: {
+            'marker-color': '#29abe2'
+          }
+        };
+	/*
+        var torchys = [
+          {
+            latlng: [30.370375, -97.756138]
+          },
+          {
+            latlng: [30.323118, -97.739144]
+          },
+          {
+            latlng: [30.302816, -97.699490]
+          },
+          {
+            latlng: [30.293479, -97.742405]
+          },
+          {
+            latlng: [30.250337, -97.754593]
+          },
+          {
+            latlng: [30.236689, -97.762730]
+          }
+        ];
+        setInterval(function(){
+          var new_torchys = JSON.parse(JSON.stringify(torchys));
+          for (var i = 0; i < new_torchys.length; i++) {
+            new_torchys[i] = {
+              marker: new_torchys[i].marker,
+              latlng: [
+                new_torchys[i].latlng[0] + (getNonZeroRandomNumber() * 0.0002),
+                new_torchys[i].latlng[1] + (getNonZeroRandomNumber() * 0.0002)
+              ]
+            }
+          }
+          pn.publish({
+            channel: channel,
+            message: new_torchys
+          });
+        }, 1000);
+	*/
+      };
+    </script>
+
+</body>
+
+<!--
 <script>
         {% include "pds/templates/includes/tracking.js" %}
         frappe.ready(function() {
                 tracking($('#map-canvas'));
         });
 </script>
+-->
