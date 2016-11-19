@@ -22,6 +22,19 @@ def send_fcm(doc, method):
 	frappe.msgprint(str(r.status_code))
 
 
+def delivery_workflow(doc, method):
+	delivery_request = frappe.get_doc("Delivery Request", doc.name)
+	#TODO: this will happen evey time a request is updated, not necessarly when delivered
+	if delivery_request.status == "Delivered":
+		clerk = frappe.get_doc("User", delivery_request.assigned_clerk)
+		clerk.status = 'Free'
+		clerk.save()
+		#TODO: pick the oldest first
+		delivery_request = frappe.get_list("Delivery Request", filters={'status':'Pending'},fields=['name'])
+		if len(delivery_request) > 0:
+			delivery_request = frappe.get_doc("Delivery Request", delivery_request[0]['name'])
+			assign_clerk(delivery_request)
+		
 def process_location(doc, method):
 	location = frappe.get_doc("Location", doc.name)
 	send_location('dashboard', location)
@@ -35,11 +48,13 @@ def process_location(doc, method):
 		if not delivery_request.dropoff_point:
 			delivery_request.dropoff_point = "%s,%s" % (location.latitude, location.longitude) 
 			assign_clerk(delivery_request)
-		#update client location every time a new client location is received``
-		delivery_request.client_location = "%s,%s" % (location.latitude, location.longitude) 
-		delivery_request.save()
+		if delivery_request.status != 'Delivered':
+			#update client location every time a new client location is received``
+			delivery_request.client_location = "%s,%s" % (location.latitude, location.longitude) 
+			delivery_request.save()
 		#send location to the assigned delivery clerk
-		send_location(delivery_request.assigned_clerk, location)
+		if delivery_request.status in ['Assigned', 'Delivering']:
+			send_location(delivery_request.assigned_clerk, location)
 	elif location.type == "Delivery Clerk":
 		#get assigned delivery request
 		send_location(location.order_number, location)
@@ -80,37 +95,47 @@ def send_pubnub_clerk(doc, method):
 
 def assign_clerk(delivery_request):
 	closest_clerk = get_closest_clerk(delivery_request.pickup_point)
-	delivery_request.assigned_clerk = closest_clerk.name
-	delivery_request.save()
-	frappe.get_doc({
-	  	"doctype": "Message", 
-	  	"delivery_clerk": closest_clerk.name,
-		"message":"A delivery task from %s to %s is assigned to you" % (delivery_request.pickup_point, delivery_request.dropoff_point),
-		"from_client": delivery_request.client_names,
-		"type":"Delivery Request",
-		"order_number": delivery_request.order_number,
-		"order_id": delivery_request.name
-	}).insert()
+	if closest_clerk:
+		delivery_request.assigned_clerk = closest_clerk.name
+		delivery_request.save()
+		closest_clerk = frappe.get_doc("User", closest_clerk.name)
+		closest_clerk.status = 'Busy'
+		closest_clerk.save()
+		frappe.get_doc({
+			"doctype": "Message", 
+			"delivery_clerk": closest_clerk.name,
+			"message":"A delivery task from %s to %s is assigned to you" % (delivery_request.pickup_point, delivery_request.dropoff_point),
+			"from_client": delivery_request.client_names,
+			"type":"Delivery Request",
+			"order_number": delivery_request.order_number,
+			"order_id": delivery_request.name
+		}).insert()
 
 def get_closest_clerk(pickup_point):
 	#get all clerks
-	all_clerks = frappe.get_list("User", fields=['name','location'])
-	#make the first clerk as the closest
-	clerk_locations = []
-	pickup_point = pickup_point.split(",")
-	#loop over all clerk comparing their current locations to the closest
-	for clerk in all_clerks:
-		if clerk.location:
-			location = clerk.location.split(",")
-			clerk_locations.append((float(location[0]), float(location[1])))
-	directions_result = gmaps.distance_matrix(clerk_locations,(pickup_point[0], pickup_point[1]))
-	closest = 0
-	for i, row in enumerate(directions_result['rows']):
-		row = row['elements'][0]
-		duration = row['duration']['value']
-		distance = row['distance']['value']
-		closest_clerk = directions_result['rows'][closest]
-		if closest_clerk['elements'][0]['duration']['value'] > duration:
-			closest = i
-	return all_clerks[closest]
+	filters = {
+		'status':'Free'
+	}
+	all_clerks = frappe.get_list("User", filters=filters, fields=['name','location'])
+	if len(all_clerks) > 0:
+		#make the first clerk as the closest
+		clerk_locations = []
+		pickup_point = pickup_point.split(",")
+		#loop over all clerk comparing their current locations to the closest
+		for clerk in all_clerks:
+			if clerk.location:
+				location = clerk.location.split(",")
+				clerk_locations.append((float(location[0]), float(location[1])))
+		directions_result = gmaps.distance_matrix(clerk_locations,(pickup_point[0], pickup_point[1]))
+		closest = 0
+		for i, row in enumerate(directions_result['rows']):
+			row = row['elements'][0]
+			duration = row['duration']['value']
+			distance = row['distance']['value']
+			closest_clerk = directions_result['rows'][closest]
+			if closest_clerk['elements'][0]['duration']['value'] > duration:
+				closest = i
+		return all_clerks[closest]
+	else:
+		return None
 
