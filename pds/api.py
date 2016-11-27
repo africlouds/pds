@@ -9,32 +9,54 @@ gmaps = googlemaps.Client(key='AIzaSyClZw3R63FghnycvQVypPxOTUZyHAXilEU')
 
 
 
-def send_fcm(doc, method):
-	delivery = frappe.get_doc("Delivery Request", doc.name)
-	headers = {'Content-type': 'application/json', 'Authorization': 'key=AIzaSyDzU4JxnT4XoE7igPuvYQy0MgilCKu9W-I'}
-	data = { "data": {
-	    #"delivery": "Derivery to %s for %s " % (delivery.dropoff_point, delivery.client_names)
-	    "delivery": "Derivery for %s. Pick UP: %s, Drop Off: %s" % (delivery.client_names, delivery.pickup_point, delivery.dropoff_point)
-	  },
-	  "to" : "cHFwFikZz3A:APA91bFL2kr3C5uWU4ol_3WrZA4jGdif3iscCoAth5VMHjRVCq6fB1pVZ4wJNhldwtf6wNv5KVBWcenBJxde58oKAClIOPSE--p2IiMM9R1r50HUTdZJSqK7YNbvCKsjGmwUnUlBkMHM"
-	}
-	r = requests.post('https://fcm.googleapis.com/fcm/send', json=data, headers=headers)
-	frappe.msgprint(str(r.status_code))
+@frappe.whitelist()
+def start_delivering(order_number):
+	delivery_request = frappe.get_doc("Delivery Request", order_number)
+	delivery_request.status = "Delivering"
+	delivery_request.save()
+	frappe.get_doc({
+		"doctype": "Message", 
+		"destination_type": "Client",
+		"destination": delivery_request.order_number,
+		"type":"Delivering"
+	}).insert()
+
+	return order_number 
+
+@frappe.whitelist()
+def finish_delivering(order_number):
+	delivery_request = frappe.get_doc("Delivery Request", order_number)
+	delivery_request.status = "Delivered"
+	delivery_request.save()
+	frappe.get_doc({
+		"doctype": "Message", 
+		"destination_type": "Client",
+		"destination": delivery_request.order_number,
+		"type":"Delivered"
+	}).insert()
+	clerk = frappe.get_doc("User", delivery_request.assigned_clerk)
+	clerk.status = 'Free'
+	clerk.save()
+	#TODO: pick the oldest first
+	delivery_request = frappe.get_list("Delivery Request", filters={'status':'Pending'},fields=['name'])
+	if len(delivery_request) > 0:
+		delivery_request = frappe.get_doc("Delivery Request", delivery_request[0]['name'])
+		assign_clerk(delivery_request)
+	return order_number 
 
 
-def delivery_workflow(doc, method):
-	delivery_request = frappe.get_doc("Delivery Request", doc.name)
-	#TODO: this will happen evey time a request is updated, not necessarly when delivered
-	if delivery_request.status == "Delivered":
-		clerk = frappe.get_doc("User", delivery_request.assigned_clerk)
-		clerk.status = 'Free'
-		clerk.save()
-		#TODO: pick the oldest first
-		delivery_request = frappe.get_list("Delivery Request", filters={'status':'Pending'},fields=['name'])
-		if len(delivery_request) > 0:
-			delivery_request = frappe.get_doc("Delivery Request", delivery_request[0]['name'])
-			assign_clerk(delivery_request)
-		
+
+def update_dashboard(doc, method):
+	pubnub = Pubnub(publish_key="pub-c-21663d8a-850d-4d99-adb3-3dda55a02abd", subscribe_key="sub-c-266bcbc0-9884-11e6-b146-0619f8945a4f")
+	messages = {'eon': {
+		'Delivered': frappe.db.count("Delivery Request", filters={"status": 'Delivered'}),
+		'Pending': frappe.db.count("Delivery Request", filters={"status": 'Pending'}),
+		'Delivering': frappe.db.count("Delivery Request", filters={"status": 'Delivering'}),
+		'Assigned': frappe.db.count("Delivery Request", filters={"status": 'Assigned'})
+	}}
+	pubnub.publish(channel='dashboard', message=messages)
+
+	
 def process_location(doc, method):
 	location = frappe.get_doc("Location", doc.name)
 	send_location('dashboard', location)
@@ -56,13 +78,28 @@ def process_location(doc, method):
 		if delivery_request.status in ['Assigned', 'Delivering']:
 			send_location(delivery_request.assigned_clerk, location)
 	elif location.type == "Delivery Clerk":
-		#get assigned delivery request
-		send_location(location.order_number, location)
-		delivery_clerk = location.delivery_clerk
-		delivery_request = frappe.get_list("Delivery Request", filters={'assigned_clerk':delivery_clerk},fields=['name'])
-		delivery_request = frappe.get_doc("Delivery Request", delivery_request[0]['name'])
-		if delivery_request.status == 'Delivering':
-			send_location(delivery_request.order_number, location)
+		if location.delivery_clerk:
+			delivery_clerk = location.delivery_clerk
+			#get assigned delivery request
+			delivery_request = frappe.get_list("Delivery Request", filters={'assigned_clerk':delivery_clerk},fields=['name'])
+			if len(delivery_request) > 0:
+				delivery_request = frappe.get_doc("Delivery Request", delivery_request[0]['name'])
+				if delivery_request.status == 'Delivering':
+					delivery_request.clerk_location = "%s,%s" % (location.latitude, location.longitude)
+					delivery_request.save()
+					delivery_request.update_stats()
+					send_location(delivery_request.order_number, location)
+					update = {
+						"remaining_time": delivery_request.remaining_time,
+						"remaining_distance": delivery_request.remaining_distance
+					}
+					frappe.get_doc({
+						"doctype": "Message", 
+						"destination_type": "Client",
+						"destination": delivery_request.order_number,
+						"type":"Update",
+						"message":  json.dumps(update)
+					}).insert()
 			
 
 	
@@ -75,23 +112,17 @@ def send_location(channel, location):
           }
 	pubnub.publish(channel=channel, message=message)
 
-def send_pubnub(doc, method):
-	location = frappe.get_doc("Location", doc.name)
-	pubnub = Pubnub(publish_key="pub-c-21663d8a-850d-4d99-adb3-3dda55a02abd", subscribe_key="sub-c-266bcbc0-9884-11e6-b146-0619f8945a4f")
-	#message = {'lat':location.latitude, 'lng':location.longitude}
-	#all_locations = frappe.get_list("Location", fields=['name','longitude','latitude'])
-	message = {
-		location.delivery_clerk:{
-            		'latlng': [location.latitude,location.longitude]
-		}
-          }
-
-	pubnub.publish(channel='mymaps', message=message)
 
 def send_pubnub_clerk(doc, method):
 	message = frappe.get_doc("Message", doc.name)
 	pubnub = Pubnub(publish_key="pub-c-21663d8a-850d-4d99-adb3-3dda55a02abd", subscribe_key="sub-c-266bcbc0-9884-11e6-b146-0619f8945a4f")
-	pubnub.publish(channel=message.delivery_clerk, message={'type':message.type, 'order_id':message.order_id} )
+	if message.destination_type == "Delivery Clerk":
+		pubnub.publish(channel=message.destination, message={'type':message.type, 'message':message.message, 'order_id':message.order_id} )
+	elif message.destination_type == "Client":
+		pubnub.publish(channel=message.destination, message={'type':message.type, 'message':message.message} )
+	pubnub.publish(channel='dashboard', message={'type':message.type} )
+			
+		
 
 def assign_clerk(delivery_request):
 	closest_clerk = get_closest_clerk(delivery_request.pickup_point)
@@ -103,13 +134,13 @@ def assign_clerk(delivery_request):
 		closest_clerk.save()
 		frappe.get_doc({
 			"doctype": "Message", 
-			"delivery_clerk": closest_clerk.name,
+			"destination_type": "Delivery Clerk",
+			"destination": closest_clerk.name,
 			"message":"A delivery task from %s to %s is assigned to you" % (delivery_request.pickup_point, delivery_request.dropoff_point),
-			"from_client": delivery_request.client_names,
 			"type":"Delivery Request",
-			"order_number": delivery_request.order_number,
 			"order_id": delivery_request.name
 		}).insert()
+
 
 def get_closest_clerk(pickup_point):
 	#get all clerks

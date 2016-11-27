@@ -73,16 +73,15 @@ app_include_js = [
 # Hook on document methods and events
 
 doc_events = {
- 	"Delivery Request": {
-# 		"after_insert": "pds.api.send_fcm",
-		#"after_insert": "pds.api.create_message"
-		"on_update": "pds.api.delivery_workflow"
+	"Delivery Request":{
+		"after_insert": "pds.api.update_dashboard",
+		"on_update": "pds.api.update_dashboard"
+
 	},
 	"Location": {
 		"after_insert": "pds.api.process_location"
 	},
 	"Message": {
-	
 		"after_insert": "pds.api.send_pubnub_clerk"
 	}
 }
