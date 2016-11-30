@@ -69,6 +69,7 @@ def process_location(doc, method):
 		#if it is the first location, set it as the drop off point and assign a clerk
 		if not delivery_request.dropoff_point:
 			delivery_request.dropoff_point = "%s,%s" % (location.latitude, location.longitude) 
+			delivery_request.dropoff_point_number = location.location_number
 			assign_clerk(delivery_request)
 		if delivery_request.status != 'Delivered':
 			#update client location every time a new client location is received``
@@ -139,6 +140,20 @@ def assign_clerk(delivery_request):
 			"message":"A delivery task from %s to %s is assigned to you" % (delivery_request.pickup_point, delivery_request.dropoff_point),
 			"type":"Delivery Request",
 			"order_id": delivery_request.name
+		}).insert()
+		frappe.get_doc({
+			"doctype": "Message", 
+			"destination_type": "Client",
+			"destination": delivery_request.order_number,
+			"type":"Assigned",
+			"message":closest_clerk.name
+		}).insert()
+		frappe.get_doc({
+			"doctype": "Message", 
+			"destination_type": "Dashboard",
+			"destination": 'dashboard',
+			"type":"Assigned",
+			"message":"{'order_number':'%s', 'clerk':'%s'}" % (delivery_request.order_number, closest_clerk.name)
 		}).insert()
 
 
