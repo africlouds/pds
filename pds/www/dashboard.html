@@ -183,85 +183,11 @@
               <li class="footer"><a href="#">View all</a></li>
             </ul>
           </li>
-          <!-- Tasks: style can be found in dropdown.less -->
-          <li class="dropdown tasks-menu">
-            <a href="#" class="dropdown-toggle" data-toggle="dropdown">
-              <i class="fa fa-flag-o"></i>
-              <span class="label label-danger">9</span>
-            </a>
-            <ul class="dropdown-menu">
-              <li class="header">You have 9 tasks</li>
-              <li>
-                <!-- inner menu: contains the actual data -->
-                <ul class="menu">
-                  <li><!-- Task item -->
-                    <a href="#">
-                      <h3>
-                        Design some buttons
-                        <small class="pull-right">20%</small>
-                      </h3>
-                      <div class="progress xs">
-                        <div class="progress-bar progress-bar-aqua" style="width: 20%" role="progressbar" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100">
-                          <span class="sr-only">20% Complete</span>
-                        </div>
-                      </div>
-                    </a>
-                  </li>
-                  <!-- end task item -->
-                  <li><!-- Task item -->
-                    <a href="#">
-                      <h3>
-                        Create a nice theme
-                        <small class="pull-right">40%</small>
-                      </h3>
-                      <div class="progress xs">
-                        <div class="progress-bar progress-bar-green" style="width: 40%" role="progressbar" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100">
-                          <span class="sr-only">40% Complete</span>
-                        </div>
-                      </div>
-                    </a>
-                  </li>
-                  <!-- end task item -->
-                  <li><!-- Task item -->
-                    <a href="#">
-                      <h3>
-                        Some task I need to do
-                        <small class="pull-right">60%</small>
-                      </h3>
-                      <div class="progress xs">
-                        <div class="progress-bar progress-bar-red" style="width: 60%" role="progressbar" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100">
-                          <span class="sr-only">60% Complete</span>
-                        </div>
-                      </div>
-                    </a>
-                  </li>
-                  <!-- end task item -->
-                  <li><!-- Task item -->
-                    <a href="#">
-                      <h3>
-                        Make beautiful transitions
-                        <small class="pull-right">80%</small>
-                      </h3>
-                      <div class="progress xs">
-                        <div class="progress-bar progress-bar-yellow" style="width: 80%" role="progressbar" aria-valuenow="20" aria-valuemin="0" aria-valuemax="100">
-                          <span class="sr-only">80% Complete</span>
-                        </div>
-                      </div>
-                    </a>
-                  </li>
-                  <!-- end task item -->
-                </ul>
-              </li>
-              <li class="footer">
-                <a href="#">View all tasks</a>
-              </li>
-            </ul>
-          </li>
           <!-- User Account: style can be found in dropdown.less -->
           <li class="dropdown user user-menu">
             <a href="#" class="dropdown-toggle" data-toggle="dropdown">
               <img src="dist/img/user2-160x160.jpg" class="user-image" alt="User Image">
-              <span class="hidden-xs">Alexander Pierce</span>
+              <span class="hidden-xs">Rene Kabagamba</span>
             </a>
             <ul class="dropdown-menu">
               <!-- User image -->
@@ -269,8 +195,8 @@
                 <img src="dist/img/user2-160x160.jpg" class="img-circle" alt="User Image">
 
                 <p>
-                  Alexander Pierce - Web Developer
-                  <small>Member since Nov. 2012</small>
+                  Rene Kabagamba- Operator 
+                  <small></small>
                 </p>
               </li>
               <!-- Menu Body -->
@@ -318,7 +244,7 @@
           <img src="dist/img/user2-160x160.jpg" class="img-circle" alt="User Image">
         </div>
         <div class="pull-left info">
-          <p>Alexander Pierce</p>
+          <p>Rene Kabagamba</p>
           <a href="#"><i class="fa fa-circle text-success"></i> Online</a>
         </div>
       </div>
@@ -398,10 +324,10 @@
 			subscribeKey: 'sub-c-266bcbc0-9884-11e6-b146-0619f8945a4f',
 			ssl: (('https:' == document.location.protocol) ? true : false)
 		      });
-		      var channel = 'dashboard';
+		      var channel = 'dashboard_stats';
 			eon.chart({
 			    pubnub: pn,
-			    channels: ["dashboard"],
+			    channels: ["dashboard_stats"],
 			    generate: {
 			      bindto: '#chart',
 			      data: {
@@ -449,12 +375,34 @@
 
 	   <div class="img-responsive pad" id='map' style="height:100%;width:100%"></div>
     <script>
+	L.RotatedMarker = L.Marker.extend({
+    options: { angle: 0 },
+    _setPos: function(pos) {
+      L.Marker.prototype._setPos.call(this, pos);
+      if (L.DomUtil.TRANSFORM) {
+        // use the CSS transform rule if available
+        this._icon.style[L.DomUtil.TRANSFORM] += ' rotate(' + this.options.angle + 'deg)';
+      } else if (L.Browser.ie) {
+        // fallback for IE6, IE7, IE8
+        var rad = this.options.angle * L.LatLng.DEG_TO_RAD,
+        costheta = Math.cos(rad),
+        sintheta = Math.sin(rad);
+        this._icon.style.filter += ' progid:DXImageTransform.Microsoft.Matrix(sizingMethod=\'auto expand\', M11=' +
+          costheta + ', M12=' + (-sintheta) + ', M21=' + sintheta + ', M22=' + costheta + ')';
+      }
+    }
+  });
+
       var pn = new PubNub({
         publishKey: 'pub-c-21663d8a-850d-4d99-adb3-3dda55a02abd',
         subscribeKey: 'sub-c-266bcbc0-9884-11e6-b146-0619f8945a4f',
         ssl: (('https:' == document.location.protocol) ? true : false)
       });
       var channel = 'dashboard';
+      var icons = {
+		client: "https://cdn4.iconfinder.com/data/icons/people-std-pack/512/girl-512.png",
+		delivery_clerk: "https://cdn2.iconfinder.com/data/icons/logistics-service/512/pizza_delivery-2-128.png"
+	};
       var map = eon.map({
         pubnub: pn,
         id: 'map',
@@ -462,13 +410,30 @@
         mbToken: 'pk.eyJ1IjoiaWFuamVubmluZ3MiLCJhIjoiZExwb0p5WSJ9.XLi48h-NOyJOCJuu1-h-Jg',
         channels:[channel],
         connect: connect,
+	rotate:false,
+	history: true,
         message: function (data) {
-          map.setView([-1.944472, 30.081003], 13);
-        }
-      });
-      function connect() {
+          map.setView([-1.944472, 30.081003], 15);
+        },
+	marker: function (latlng, data) {
+	    var marker = new L.RotatedMarker(latlng, {
+	      icon: L.icon({
+		iconUrl: icons[data.type],
+		iconSize: [32, 30]
+	      })
+	    });
+
+	    marker.bindPopup(data.routeTag.toUpperCase());
+
+	    return marker;
+	
+
+          }
+     });
+     function connect() {
         var me = {
           icon: {
+       
             'marker-color': '#ce1126'
           }
         };
@@ -477,44 +442,6 @@
             'marker-color': '#29abe2'
           }
         };
-	/*
-        var torchys = [
-          {
-            latlng: [30.370375, -97.756138]
-          },
-          {
-            latlng: [30.323118, -97.739144]
-          },
-          {
-            latlng: [30.302816, -97.699490]
-          },
-          {
-            latlng: [30.293479, -97.742405]
-          },
-          {
-            latlng: [30.250337, -97.754593]
-          },
-          {
-            latlng: [30.236689, -97.762730]
-          }
-        ];
-        setInterval(function(){
-          var new_torchys = JSON.parse(JSON.stringify(torchys));
-          for (var i = 0; i < new_torchys.length; i++) {
-            new_torchys[i] = {
-              marker: new_torchys[i].marker,
-              latlng: [
-                new_torchys[i].latlng[0] + (getNonZeroRandomNumber() * 0.0002),
-                new_torchys[i].latlng[1] + (getNonZeroRandomNumber() * 0.0002)
-              ]
-            }
-          }
-          pn.publish({
-            channel: channel,
-            message: new_torchys
-          });
-        }, 1000);
-	*/
       };
     </script>
 

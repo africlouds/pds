@@ -11,7 +11,7 @@ gmaps = googlemaps.Client(key='AIzaSyClZw3R63FghnycvQVypPxOTUZyHAXilEU')
 
 class DeliveryRequest(Document):
 	def update_stats(self):
-		if self.clerk_location and self.client_location:
+		if self.clerk_location and self.client_location and self.dropoff_point:
 			pickup_point = tuple(self.pickup_point.split(",")) 
 			dropoff_point = tuple(self.dropoff_point.split(",")) 
 			clerk_location = tuple(self.clerk_location.split(",")) 
