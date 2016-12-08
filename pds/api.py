@@ -20,7 +20,13 @@ def start_delivering(order_number):
 		"destination": delivery_request.order_number,
 		"type":"Delivering"
 	}).insert()
-
+	frappe.get_doc({
+		"doctype": "Location", 
+		"type": "Delivery Clerk",
+		"delivery_clerk": delivery_request.assigned_clerk,
+		"latitude":"0",
+		"longitude":"0"
+	}).insert()
 	return order_number 
 
 @frappe.whitelist(allow_guest=True)
@@ -36,6 +42,7 @@ def finish_delivering(order_number):
 	}).insert()
 	clerk = frappe.get_doc("User", delivery_request.assigned_clerk)
 	clerk.status = 'Free'
+	clerk.delivery_request = None
 	clerk.save()
 	#TODO: pick the oldest first
 	delivery_request = frappe.get_list("Delivery Request", filters={'status':'Pending'},fields=['name'])
@@ -87,13 +94,14 @@ def process_location(doc, method):
 		if delivery_request.status in ['Pending','Delivering']:
 			send_location('dashboard', location)
 	elif location.type == "Delivery Clerk":
-		send_location('dashboard', location)
+		icon = "pending_delivery_clerk"
 		if location.delivery_clerk:
 			delivery_clerk = location.delivery_clerk
 			#get assigned delivery request
 			delivery_request = frappe.get_list("Delivery Request", filters={'assigned_clerk':delivery_clerk},fields=['name'])
 			if len(delivery_request) > 0:
 				delivery_request = frappe.get_doc("Delivery Request", delivery_request[0]['name'])
+				icon = '%s_delivery_clerk' % delivery_request.status.lower()
 				if delivery_request.status == 'Delivering':
 					delivery_request.clerk_location = "%s,%s" % (location.latitude, location.longitude)
 					delivery_request.save()
@@ -110,15 +118,24 @@ def process_location(doc, method):
 						"type":"Update",
 						"message":  json.dumps(update)
 					}).insert()
+		send_location('dashboard', location, icon)
 			
 
 	
-def send_location(channel, location):
+def send_location(channel, location, icon=None):
 	pubnub = Pubnub(publish_key="pub-c-21663d8a-850d-4d99-adb3-3dda55a02abd", subscribe_key="sub-c-266bcbc0-9884-11e6-b146-0619f8945a4f")
+	clerk_identifier = ""
+	if location.type == "Delivery Clerk":
+		delivery_clerk = frappe.get_doc("User", location.delivery_clerk)
+		delivery_request = frappe.get_doc("Delivery Request", delivery_clerk.delivery_request)
+		clerk_identifier = delivery_request.status.lower()+"_"+location.delivery_clerk
+		
 	message = {
-		location.order_number if location.type ==  'Client' else location.delivery_clerk:{
-			'data': {'routeTag':location.order_number if location.type ==  'Client' else location.delivery_clerk,
-				 'type':'client' if location.type ==  'Client' else 'delivery_clerk'},
+		location.order_number if location.type ==  'Client' else clerk_identifier:{
+			'data': {
+					'routeTag':location.order_number if location.type ==  'Client' else clerk_identifier,
+				 	'type':'client' if location.type ==  'Client' else icon
+			},
             		'latlng': [location.latitude,location.longitude]
 		}
           }
@@ -143,6 +160,7 @@ def assign_clerk(delivery_request):
 		delivery_request.save()
 		closest_clerk = frappe.get_doc("User", closest_clerk.name)
 		closest_clerk.status = 'Busy'
+		closest_clerk.delivery_request = delivery_request.name
 		closest_clerk.save()
 		frappe.get_doc({
 			"doctype": "Message", 
