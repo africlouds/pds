@@ -56,7 +56,7 @@ def finish_delivering(order_number):
 def update_dashboard(doc, method):
 	pubnub = Pubnub(publish_key="pub-c-21663d8a-850d-4d99-adb3-3dda55a02abd", subscribe_key="sub-c-266bcbc0-9884-11e6-b146-0619f8945a4f")
 	messages = {'eon': {
-		'Delivered': frappe.db.count("Delivery Request", filters={"status": 'Delivered'}),
+		'Delivered': frappe.db.sql("SELECT COUNT(NAME) FROM `tabDelivery Request` WHERE status='Delivered' and creation >= '%s'" % '2016-12-08'),
 		'Pending': frappe.db.count("Delivery Request", filters={"status": 'Pending'}),
 		'Delivering': frappe.db.count("Delivery Request", filters={"status": 'Delivering'}),
 		'Assigned': frappe.db.count("Delivery Request", filters={"status": 'Assigned'})
@@ -124,11 +124,18 @@ def process_location(doc, method):
 	
 def send_location(channel, location, icon=None):
 	pubnub = Pubnub(publish_key="pub-c-21663d8a-850d-4d99-adb3-3dda55a02abd", subscribe_key="sub-c-266bcbc0-9884-11e6-b146-0619f8945a4f")
-	clerk_identifier = ""
+	clerk_identifier = location.delivery_clerk
 	if location.type == "Delivery Clerk":
 		delivery_clerk = frappe.get_doc("User", location.delivery_clerk)
-		delivery_request = frappe.get_doc("Delivery Request", delivery_clerk.delivery_request)
-		clerk_identifier = delivery_request.status.lower()+"_"+location.delivery_clerk
+		try:
+			delivery_request = frappe.get_doc("Delivery Request", delivery_clerk.delivery_request)
+			if delivery_request:
+				clerk_identifier = delivery_request.status.lower()+"_"+location.delivery_clerk
+			else:
+				clerk_identifier = "pending_"+location.delivery_clerk
+		except:
+			clerk_identifier = "pending_"+location.delivery_clerk
+			
 		
 	message = {
 		location.order_number if location.type ==  'Client' else clerk_identifier:{
